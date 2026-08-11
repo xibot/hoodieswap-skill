@@ -1,6 +1,6 @@
 ---
 name: hoodieswap-skill
-description: Discover Robinhood Chain crypto and stock tokens, request Hoodieswap quotes, prepare approvals and unsigned swaps, and dry-run Doppler token launches. Use when an agent needs to research or prepare a Hoodieswap trade or launch while preserving self-custody and requiring explicit wallet review and signature.
+description: Discover Robinhood Chain crypto and stock tokens, request Hoodieswap quotes, prepare approvals and unsigned swaps, and dry-run Doppler token launches with an EOA or OnChainHoodies ERC-6551 HoodWallet. Use when an agent needs to research or prepare a Hoodieswap trade or launch while preserving self-custody and requiring explicit wallet review and authorized signature.
 ---
 
 # Hoodieswap Skill
@@ -17,6 +17,14 @@ Use Hoodieswap as a non-custodial execution preparation layer on Robinhood Chain
 - Read [references/safety.md](references/safety.md) before preparing any transaction.
 - Read [references/schemas.md](references/schemas.md) for request and response fields.
 - Read [references/robinhood-chain.md](references/robinhood-chain.md) for canonical network values.
+- Read [references/hoodwallet.md](references/hoodwallet.md) when the signing account is an OnChainHoodies ERC-6551 HoodWallet.
+
+## Choose the signer profile
+
+- `eoa`: prepare the transaction for a conventional externally owned wallet.
+- `och-hoodwallet`: resolve the Hoodie owner and deterministic ERC-6551 account through OnChainHoodies, quote with the HoodWallet address as `swapper`, then pass the prepared call to the HoodWallet's authorized execution method.
+- Never treat a token-bound account as having a standalone private key. Its current NFT owner or another explicitly authorized controller must approve and execute the call.
+- The OnChainHoodies public API provides identity, ownership, and wallet context. It does not itself authorize or sign a HoodWallet transaction.
 
 ## Trade workflow
 
@@ -29,7 +37,8 @@ Use Hoodieswap as a non-custodial execution preparation layer on Robinhood Chain
 7. If the input is ERC-20 and the quote reports an approval, prepare the required approval transaction(s). Do not silently approve unlimited spending.
 8. Run `node scripts/prepare-swap.mjs --quote-file quote.json` or call `/swap/prepare` with the selected provider quote.
 9. Verify chain ID, target, value, calldata presence, token pair, and amount again.
-10. Return the unsigned transaction to the wallet for explicit review and signature. Never broadcast it from the agent unless the user separately uses an authorized wallet tool and confirms the exact action.
+10. Return the unsigned transaction to the selected signer adapter for explicit review. For `och-hoodwallet`, wrap only the exact prepared target, value, and calldata in the HoodWallet execution call after verifying current Hoodie ownership.
+11. Never broadcast it from the agent unless the user has separately enabled an authorized wallet tool or policy and approved the exact action.
 
 ## Launch workflow
 
@@ -38,7 +47,7 @@ Use Hoodieswap as a non-custodial execution preparation layer on Robinhood Chain
 3. Submit the canonical preflight payload with `source: "launchpad"`, `mode: "preflight"`, and `dryRun: true`.
 4. Present the predicted token and pool, total supply, fee, full beneficiary split, pair, safety properties, gas estimate, and transaction target.
 5. Stop for user review. The preflight is not authorization to launch.
-6. Only the creator wallet may sign and send the returned Airlock transaction.
+6. Only the creator account may authorize and send the returned Airlock transaction. A HoodWallet creator must execute it through the authorized ERC-6551 account path.
 
 ## Determinism and error handling
 
