@@ -1,0 +1,12 @@
+{
+  "name": "hoodieswap-skill",
+  "version": "1.0.0",
+  "private": false,
+  "type": "module",
+  "description": "Agent skill and TypeScript client for non-custodial Hoodieswap transaction preparation on Robinhood Chain.",
+  "exports": { ".": "./dist/client.js", "./types": "./dist/types.js" },
+  "files": ["SKILL.md", "agents", "dist", "openapi", "references", "scripts"],
+  "scripts": { "build": "tsc -p tsconfig.json", "check": "tsc -p tsconfig.json --noEmit" },
+  "devDependencies": { "typescript": "^5.9.2" },
+  "license": "MIT"
+}

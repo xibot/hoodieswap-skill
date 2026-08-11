@@ -1,0 +1,4 @@
+interface:
+  display_name: "Hoodieswap"
+  short_description: "Prepare safe Robinhood Chain trades and launches"
+  default_prompt: "Use $hoodieswap-skill to discover a Robinhood Chain asset, obtain a deterministic quote, and prepare an unsigned transaction for my review."

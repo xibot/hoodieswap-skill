@@ -1,0 +1,166 @@
+openapi: 3.1.0
+info:
+  title: Hoodieswap Agent API
+  version: 1.0.0
+  description: Non-custodial Robinhood Chain discovery, quote, simulation, and unsigned transaction preparation.
+servers:
+  - url: https://hoodieswap.xyz/api/v1
+paths:
+  /capabilities:
+    get:
+      operationId: getCapabilities
+      responses:
+        "200": { description: Supported agent capabilities }
+  /tokens:
+    get:
+      operationId: listTokens
+      responses:
+        "200": { description: Discovered Robinhood Chain crypto tokens }
+  /stocks:
+    get:
+      operationId: listStocks
+      responses:
+        "200": { description: Canonical Robinhood stock-token registry }
+  /quote:
+    post:
+      operationId: getQuote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QuoteRequest" }
+      responses:
+        "200":
+          description: Executable route candidates
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuoteResponse" }
+        "404": { description: No executable route }
+  /approval:
+    post:
+      operationId: prepareApproval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApprovalRequest" }
+      responses:
+        "200": { description: Unsigned approval transaction or transactions }
+  /swap/prepare:
+    post:
+      operationId: prepareSwap
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PrepareSwapRequest" }
+      responses:
+        "200": { description: Unsigned swap transaction }
+  /launch/preflight:
+    post:
+      operationId: preflightLaunch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LaunchPayload" }
+      responses:
+        "200": { description: Successful simulation and unsigned Airlock create transaction }
+        "422": { description: Doppler simulation failed }
+components:
+  schemas:
+    Address:
+      type: string
+      pattern: "^0x[a-fA-F0-9]{40}$"
+    Transaction:
+      type: object
+      required: [to, data, value]
+      properties:
+        chainId: { type: integer, const: 4663 }
+        to: { $ref: "#/components/schemas/Address" }
+        data: { type: string, pattern: "^0x[a-fA-F0-9]*$" }
+        value: { type: string, pattern: "^[0-9]+$" }
+    QuoteRequest:
+      type: object
+      required: [tokenIn, tokenOut, amount, formattedAmount]
+      properties:
+        tokenIn: { $ref: "#/components/schemas/Address" }
+        tokenOut: { $ref: "#/components/schemas/Address" }
+        amount: { type: string, pattern: "^[0-9]+$", description: Raw integer amount }
+        formattedAmount: { type: string, pattern: "^[0-9]+(\\.[0-9]+)?$" }
+        swapper: { $ref: "#/components/schemas/Address" }
+        exactPool: { type: string, description: V3 address or V4 pool ID }
+        launchPoolRequired: { type: boolean, default: false }
+    ProviderQuote:
+      type: object
+      required: [provider, outputAmount]
+      properties:
+        provider: { type: string, enum: [UNISWAP, ZEROX, RIALTO, DOPPLER_POOL] }
+        outputAmount: { type: string, pattern: "^[0-9]+$" }
+        quote: { type: object, additionalProperties: true }
+        transaction: { $ref: "#/components/schemas/Transaction" }
+        approval: { type: object, properties: { token: { $ref: "#/components/schemas/Address" }, spender: { $ref: "#/components/schemas/Address" } } }
+        priceImpactBps: { type: [number, "null"] }
+        settlement: { type: string }
+    QuoteResponse:
+      type: object
+      required: [best, quotes, providers, checkedAt]
+      properties:
+        best: { $ref: "#/components/schemas/ProviderQuote" }
+        quotes: { type: array, items: { $ref: "#/components/schemas/ProviderQuote" } }
+        providers: { type: array, items: { type: object, additionalProperties: true } }
+        checkedAt: { type: string, format: date-time }
+    ApprovalRequest:
+      type: object
+      required: [provider, walletAddress, token, tokenOut, amount]
+      properties:
+        provider: { type: string, enum: [UNISWAP, ZEROX, RIALTO, DOPPLER_POOL] }
+        walletAddress: { $ref: "#/components/schemas/Address" }
+        token: { $ref: "#/components/schemas/Address" }
+        tokenOut: { $ref: "#/components/schemas/Address" }
+        amount: { type: string, pattern: "^[0-9]+$" }
+        spender: { $ref: "#/components/schemas/Address" }
+    PrepareSwapRequest:
+      type: object
+      required: [provider]
+      properties:
+        provider: { type: string, enum: [UNISWAP, ZEROX, RIALTO, DOPPLER_POOL] }
+        quote: { type: object, additionalProperties: true }
+        transaction: { $ref: "#/components/schemas/Transaction" }
+    LaunchPayload:
+      type: object
+      required: [source, mode, dryRun, token, creator]
+      properties:
+        source: { const: launchpad }
+        mode: { const: preflight }
+        dryRun: { const: true }
+        token:
+          type: object
+          required: [chain, name, ticker, description, imageUrl, pair]
+          properties:
+            chain: { const: robinhood }
+            name: { type: string, minLength: 1, maxLength: 64 }
+            ticker: { type: string, pattern: "^[A-Z0-9]{1,12}$" }
+            description: { type: string, minLength: 1, maxLength: 1000 }
+            imageUrl: { type: string }
+            metadataUrl: { type: string }
+            website: { type: string }
+            xAccount: { type: string }
+            pair:
+              oneOf:
+                - type: object
+                  required: [mode]
+                  properties: { mode: { const: weth } }
+                - type: object
+                  required: [mode, address]
+                  properties: { mode: { const: stock }, address: { $ref: "#/components/schemas/Address" } }
+        creator:
+          type: object
+          required: [walletAddress, email]
+          properties:
+            walletAddress: { $ref: "#/components/schemas/Address" }
+            email: { type: string, format: email }
+x-hoodieswap-safety:
+  custody: false
+  serverSigning: false
+  walletMustReviewAndSign: true
